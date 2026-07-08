@@ -11,27 +11,26 @@ The current payload in `pwn.c` does this when the exploit lands:
 
 ## Contents
 
+- `admin_setup.cmd`: run this once from an elevated administrator shell
+- `guest_trigger.cmd`: run this while logged in as built-in `Guest`
 - `exploit_host2.cpp`: fake RasMan host
 - `pwn.c`: DLL payload
 - `pwn.pbk`: custom PBK used on the hangup path
 - `signal_event.c`: sets `RasAutoDialSharedConnectionEvent`
 - `launch_guest.c`: starts a process as low-priv `guestlab`
-- `launch_builtin_guest.c`: starts a process as built-in `Guest`
+- `launch_builtin_guest.c`: helper source for the built-in `Guest` launcher
 - `list_sessions.c`: WTS session dump helper
 - `probe_console_token.c`: checks whether the active console user token is queryable
 - `query_shared_connection.c`: shared-connection environment check
 - `fix_guest_logon.ps1`: Guest logon-rights repair script
-- `build_guest_chain.cmd`: builds all required binaries on the Windows VM
-- `check_guest_state.cmd`: checks the exact Guest-console state
-- `run_guest_chain.cmd`: runs the built-in `Guest` trigger path
 
 ## Intended State
 
-This package is for the **built-in `Guest`** path, not the post-logoff variant and not the `guestlab` interactive-user variant.
+This package is for the built-in `Guest` path only.
 
 Known-good runtime shape:
 
-- built-in `Guest` is the active **console** user
+- built-in `Guest` is the active console user
 - no admin GUI session is active
 - `guestlab` exists and has password `password`
 - the lab already has the shared-autodial / ICS / shared-VPN prerequisites in place
@@ -44,72 +43,68 @@ Copy the contents of this directory to:
 C:\Users\Public\Desktop\EXPLOIT
 ```
 
-The batch files assume that exact path.
+The scripts assume that exact path.
 
-## Prepare Built-in Guest On A Fresh VM
+## Step 1: Run The Administrative Setup
 
-From an elevated `cmd.exe` on the VM:
-
-```cmd
-net user Guest /active:yes
-net user Guest password
-net user guestlab password
-net localgroup "Remote Desktop Users" Guest /add
-```
-
-If Guest logon is denied, run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File C:\Users\Public\Desktop\EXPLOIT\fix_guest_logon.ps1
-```
-
-Then log in **manually** as built-in `Guest` on the VM console. Do not log in as `asritha` in the GUI first.
-
-## Build
-
-From an elevated `cmd.exe` on the VM:
+Open an elevated `cmd.exe` and run:
 
 ```cmd
 cd C:\Users\Public\Desktop\EXPLOIT
-build_guest_chain.cmd
+admin_setup.cmd
 ```
 
-## Verify Guest State
+What `admin_setup.cmd` does:
 
-Still from the VM:
-
-```cmd
-cd C:\Users\Public\Desktop\EXPLOIT
-check_guest_state.cmd
-```
-
-What you want:
-
-- `quser` shows `guest  console  <id>  Active`
-- `list_sessions.exe` shows `station=Console user=ASRITHA-WINDOWS\\Guest`
-
-If the VM is in a bad session state, log off the GUI user and log back in manually as built-in `Guest` on the console.
-
-## Trigger The Exploit
-
-From an elevated `cmd.exe` or SSH admin shell on the VM:
-
-```cmd
-cd C:\Users\Public\Desktop\EXPLOIT
-run_guest_chain.cmd
-```
-
-That script does:
-
-- removes `guestlab` from `Administrators` up front
-- kills any old fake RasMan host
+- prints each step with `[+]`
+- finds `VsDevCmd.bat` from common Visual Studio locations
+- enables built-in `Guest`
+- sets:
+  - `Guest` password to `password`
+  - `guestlab` password to `password`
+- adds `Guest` to `Remote Desktop Users`
+- runs `fix_guest_logon.ps1`
+- builds all required binaries
+- removes `guestlab` from `Administrators`
 - clears old proof files
 - stops `RasMan`
 - starts `RasAuto`
 - starts the fake RasMan host as low-priv `guestlab`
-- triggers `RasAutoDialSharedConnectionEvent` as built-in `Guest`
+- prints the current session and console-token state
+
+If the script says it cannot find `VsDevCmd.bat`, install the Visual Studio C++ build tools or edit the script with the correct path.
+
+## Step 2: Log In As Built-in Guest
+
+After `admin_setup.cmd` completes:
+
+1. Log out of any GUI admin session.
+2. Log in manually as built-in `Guest`.
+3. Make sure this is the visible console session.
+
+The package is written for the built-in `Guest` account, not `guestlab`.
+
+## Step 3: Run The Guest Trigger
+
+While logged in as built-in `Guest`, open `cmd.exe` and run:
+
+```cmd
+cd C:\Users\Public\Desktop\EXPLOIT
+guest_trigger.cmd
+```
+
+What `guest_trigger.cmd` does:
+
+- prints each step with `[+]`
+- shows `whoami`
+- runs `signal_event.exe`
 - waits for the SYSTEM cleanup path
-- prints the proof files and final `Administrators` membership
+- prints:
+  - `squatter.log`
+  - `load.txt`
+  - `group_add.txt`
+  - `system.txt`
+  - final `Administrators` membership
 
 ## Success Criteria
 
@@ -123,6 +118,8 @@ Successful output should include:
 
 ## Notes
 
-- `run_guest_chain.cmd` is the main entrypoint for the working built-in `Guest` path.
-- The current package is intentionally scoped to the built-in `Guest` variant that was previously exercised successfully.
-- The post-logoff / no-user `guestlab` scheduled-task path is not included here because it did not reach `ReferenceCustomCount` end to end with the current fake-RasMan behavior.
+- The full flow is now exactly two scripts:
+  - `admin_setup.cmd`
+  - `guest_trigger.cmd`
+- `admin_setup.cmd` must be run first.
+- `guest_trigger.cmd` must be run while logged in as built-in `Guest`.
