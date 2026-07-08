@@ -162,7 +162,7 @@ function Connect-Vpn(
     $output = & rasdial.exe @arguments 2>&1
     if ($LASTEXITCODE -ne 0) {
         $text = ($output | Out-String).Trim()
-        throw "rasdial failed with $LASTEXITCODE: $text"
+        throw "rasdial failed with ${LASTEXITCODE}: $text"
     }
 }
 
