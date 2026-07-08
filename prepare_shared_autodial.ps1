@@ -136,9 +136,17 @@ function Ensure-VpnConnection(
             Remove-VpnConnection `
                 -Name $Name `
                 -AllUserConnection `
-                -Force | Out-Null
+                -Force `
+                -ErrorAction Stop | Out-Null
         } catch {
             Write-Step "Could not remove '$Name'; reusing the existing entry"
+        }
+
+        $existing = Get-VpnConnection `
+            -Name $Name `
+            -AllUserConnection `
+            -ErrorAction SilentlyContinue
+        if ($existing) {
             return
         }
     }
