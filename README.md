@@ -5,7 +5,7 @@ This directory contains the built-in `Guest` trigger path for the RasAuto/RasMan
 The current payload in `pwn.c` does this when the exploit lands:
 
 - loads `pwn.dll` in the SYSTEM `rasauto` process
-- runs `net localgroup Administrators guestlab /add`
+- runs `net localgroup Administrators <helper-user> /add`
 - writes `group_add.txt`
 - writes `system.txt` with `whoami`
 
@@ -17,7 +17,7 @@ The current payload in `pwn.c` does this when the exploit lands:
 - `pwn.c`: DLL payload
 - `pwn.pbk`: custom PBK used on the hangup path
 - `signal_event.c`: sets `RasAutoDialSharedConnectionEvent`
-- `launch_guest.c`: starts a process as low-priv `guestlab`
+- `launch_guest.c`: starts a process as the chosen low-priv helper account
 - `launch_builtin_guest.c`: helper source for the built-in `Guest` launcher
 - `list_sessions.c`: WTS session dump helper
 - `probe_console_token.c`: checks whether the active console user token is queryable
@@ -32,7 +32,7 @@ Known-good runtime shape:
 
 - built-in `Guest` is the active console user
 - no admin GUI session is active
-- `guestlab` is the low-priv helper account used to own the fake RasMan endpoint
+- a low-priv helper account is used to own the fake RasMan endpoint
 - the lab already has the shared-autodial / ICS / shared-VPN prerequisites in place
 
 ## Copy To The VM
@@ -57,23 +57,26 @@ admin_setup.cmd
 What `admin_setup.cmd` does:
 
 - prints each step with `[+]`
-- finds `VsDevCmd.bat` from common Visual Studio locations
+- prompts for:
+  - low-priv helper username
+  - low-priv helper password
+  - built-in `Guest` password, which can be left blank
+- finds `VsDevCmd.bat` from common Visual Studio locations, then prompts for the path if autodiscovery fails
 - enables built-in `Guest`
-- sets:
-  - `Guest` password to `password`
-  - `guestlab` password to `password`
-- creates `guestlab` automatically if it does not already exist
+- updates the built-in `Guest` password to the value you entered
+- creates the helper account automatically if it does not already exist
 - adds `Guest` to `Remote Desktop Users`
 - runs `fix_guest_logon.ps1`
 - builds all required binaries
-- removes `guestlab` from `Administrators`
+- bakes the chosen helper username into `pwn.dll`
+- removes the helper account from `Administrators`
 - clears old proof files
 - stops `RasMan`
 - starts `RasAuto`
-- starts the fake RasMan host as low-priv `guestlab`
+- starts the fake RasMan host as the chosen low-priv helper account
 - prints the current session and console-token state
 
-If the script says it cannot find `VsDevCmd.bat`, install the Visual Studio C++ build tools or edit the script with the correct path.
+If the script prompts for `VsDevCmd.bat`, paste the full path from your machine.
 
 ## Step 2: Log In As Built-in Guest
 
@@ -113,9 +116,9 @@ Successful output should include:
 
 - `squatter.log` contains `SubmitRequestLocal code=101`
 - `load.txt` contains `loaded`
-- `group_add.txt` shows the `net localgroup Administrators guestlab /add` result
+- `group_add.txt` shows the `net localgroup Administrators <helper-user> /add` result
 - `system.txt` contains `nt authority\system`
-- `net localgroup Administrators` now lists `guestlab`
+- `net localgroup Administrators` now lists the helper account you chose during `admin_setup.cmd`
 
 ## Notes
 

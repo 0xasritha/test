@@ -2,16 +2,67 @@
 
 #include <wchar.h>
 
-int wmain(int argc, wchar_t** argv) {
-    int wait = 0;
-    int first_arg = 1;
-    if (argc > 1 && wcscmp(argv[1], L"--wait") == 0) {
-        wait = 1;
-        first_arg = 2;
+static int parse_args(
+    int argc,
+    wchar_t** argv,
+    int* wait,
+    const wchar_t** user,
+    const wchar_t** password,
+    int* first_arg
+) {
+    *wait = 0;
+    *user = L"guestlab";
+    *password = L"password";
+    *first_arg = 1;
+
+    while (*first_arg < argc) {
+        if (wcscmp(argv[*first_arg], L"--wait") == 0) {
+            *wait = 1;
+            ++*first_arg;
+            continue;
+        }
+        if (wcscmp(argv[*first_arg], L"--user") == 0) {
+            ++*first_arg;
+            if (*first_arg >= argc) {
+                return 64;
+            }
+            *user = argv[*first_arg];
+            ++*first_arg;
+            continue;
+        }
+        if (wcscmp(argv[*first_arg], L"--password") == 0) {
+            ++*first_arg;
+            if (*first_arg >= argc) {
+                return 64;
+            }
+            *password = argv[*first_arg];
+            ++*first_arg;
+            continue;
+        }
+        break;
     }
 
-    if (argc <= first_arg) {
+    if (argc <= *first_arg) {
         return 64;
+    }
+    return 0;
+}
+
+int wmain(int argc, wchar_t** argv) {
+    int wait = 0;
+    const wchar_t* user = L"guestlab";
+    const wchar_t* password = L"password";
+    int first_arg = 1;
+    int parse_status = parse_args(
+        argc,
+        argv,
+        &wait,
+        &user,
+        &password,
+        &first_arg
+    );
+    if (parse_status != 0) {
+        return parse_status;
     }
 
     wchar_t cmdline[2048];
@@ -28,9 +79,9 @@ int wmain(int argc, wchar_t** argv) {
     si.cb = sizeof(si);
 
     BOOL ok = CreateProcessWithLogonW(
-        L"guestlab",
+        user,
         L".",
-        L"password",
+        password,
         LOGON_WITH_PROFILE,
         NULL,
         cmdline,
