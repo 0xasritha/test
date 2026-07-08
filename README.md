@@ -23,6 +23,7 @@ The current payload in `pwn.c` does this when the exploit lands:
 - `probe_console_token.c`: checks whether the active console user token is queryable
 - `query_shared_connection.c`: shared-connection environment check
 - `fix_guest_logon.ps1`: Guest logon-rights repair script
+- `the-vulnerable-rasmans.dll`: vulnerable RasMan image loaded by `exploit_host2.exe`
 
 ## Intended State
 
@@ -74,6 +75,7 @@ What `admin_setup.cmd` does:
 - stops `RasMan`
 - starts `RasAuto`
 - starts the fake RasMan host as the chosen low-priv helper account
+- verifies that `exploit_host2.exe` is still running and that `squatter.log` was created
 - prints the current session and console-token state
 
 If the script prompts for `VsDevCmd.bat`, paste the full path from your machine.
