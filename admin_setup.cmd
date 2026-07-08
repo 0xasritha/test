@@ -28,7 +28,14 @@ if errorlevel 1 (
 echo [+] Enabling built-in Guest and setting lab passwords
 net user Guest /active:yes
 net user Guest password
-net user guestlab password
+net user guestlab >nul 2>&1
+if errorlevel 1 (
+    echo [+] Creating low-priv helper user guestlab
+    net user guestlab password /add
+) else (
+    echo [+] Updating password for existing guestlab
+    net user guestlab password
+)
 net localgroup "Remote Desktop Users" Guest /add >nul 2>&1
 
 echo [+] Repairing Guest logon rights

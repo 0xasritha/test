@@ -32,7 +32,7 @@ Known-good runtime shape:
 
 - built-in `Guest` is the active console user
 - no admin GUI session is active
-- `guestlab` exists and has password `password`
+- `guestlab` is the low-priv helper account used to own the fake RasMan endpoint
 - the lab already has the shared-autodial / ICS / shared-VPN prerequisites in place
 
 ## Copy To The VM
@@ -62,6 +62,7 @@ What `admin_setup.cmd` does:
 - sets:
   - `Guest` password to `password`
   - `guestlab` password to `password`
+- creates `guestlab` automatically if it does not already exist
 - adds `Guest` to `Remote Desktop Users`
 - runs `fix_guest_logon.ps1`
 - builds all required binaries
