@@ -76,6 +76,7 @@ It then:
 - creates an all-users PPTP VPN entry
 - normalizes the phonebook entry to `WAN Miniport (PPTP)`
 - stores saved RAS credentials in the all-users phonebook
+- connects the VPN once with `rasdial`
 - enables ICS with the VPN as the public shared connection
 - prints `RasGetCredentialsW` and `RasQuerySharedConnectionW` verification
 

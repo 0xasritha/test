@@ -147,6 +147,25 @@ function Ensure-VpnConnection(
         -Force | Out-Null
 }
 
+function Connect-Vpn(
+    [string]$Name,
+    [string]$UserName,
+    [string]$Password
+) {
+    Write-Step "Connecting VPN entry '$Name' once with rasdial"
+    $arguments = @(
+        $Name,
+        $UserName,
+        $Password,
+        "/PHONEBOOK:$phonebookPath"
+    )
+    $output = & rasdial.exe @arguments 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $text = ($output | Out-String).Trim()
+        throw "rasdial failed with $LASTEXITCODE: $text"
+    }
+}
+
 function Update-PhonebookEntry(
     [string]$EntryName,
     [hashtable]$Values
@@ -352,6 +371,7 @@ Update-PhonebookEntry `
         CustomAuthKey = '0'
     }
 Set-RasCredentials -EntryName $vpnName -UserName $vpnUser -Password $vpnPassword
+Connect-Vpn -Name $vpnName -UserName $vpnUser -Password $vpnPassword
 try {
     Enable-Ics -PublicName $vpnName -PrivateName $privateAdapter
 } catch {
