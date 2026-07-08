@@ -104,6 +104,11 @@ function Ensure-SharedAutoDial {
 
 function Ensure-ServiceRunning([string]$Name) {
     $service = Get-Service -Name $Name -ErrorAction Stop
+    if ($service.StartType -eq 'Disabled') {
+        Write-Step "Setting $Name startup type to Manual"
+        Set-Service -Name $Name -StartupType Manual
+        $service = Get-Service -Name $Name -ErrorAction Stop
+    }
     if ($service.Status -eq 'Running') {
         Write-Step "$Name is already running"
         return
@@ -333,6 +338,8 @@ Get-NetAdapter | Sort-Object Name | Format-Table -AutoSize Name, InterfaceDescri
 Write-Host
 $privateAdapter = Read-RequiredValue -Prompt 'Private ICS adapter name'
 
+Ensure-ServiceRunning -Name 'MpsSvc'
+Ensure-ServiceRunning -Name 'SharedAccess'
 Ensure-ServiceRunning -Name 'RasMan'
 Ensure-SharedAutoDial
 Ensure-VpnConnection -Name $vpnName -ServerAddress $vpnServer
@@ -345,7 +352,15 @@ Update-PhonebookEntry `
         CustomAuthKey = '0'
     }
 Set-RasCredentials -EntryName $vpnName -UserName $vpnUser -Password $vpnPassword
-Enable-Ics -PublicName $vpnName -PrivateName $privateAdapter
+try {
+    Enable-Ics -PublicName $vpnName -PrivateName $privateAdapter
+} catch {
+    Write-Host
+    Write-Host '[!] Failed to enable ICS'
+    Write-Host "[!] SharedAccess state: $((Get-Service -Name 'SharedAccess').Status)"
+    Write-Host "[!] MpsSvc state: $((Get-Service -Name 'MpsSvc').Status)"
+    throw
+}
 
 $sharedAutoDial = Get-ItemPropertyValue `
     -Path 'HKLM:\System\CurrentControlSet\Services\SharedAccess\Parameters' `
