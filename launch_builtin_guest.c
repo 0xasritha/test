@@ -30,7 +30,7 @@ int wmain(int argc, wchar_t** argv) {
 
     BOOL ok = CreateProcessWithLogonW(
         L"Guest",
-        L"ASRITHA-WINDOWS",
+        L".",
         L"password",
         LOGON_WITH_PROFILE,
         NULL,
