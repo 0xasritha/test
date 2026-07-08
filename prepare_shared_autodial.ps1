@@ -80,8 +80,6 @@ function Ensure-PhonebookDirectory {
 
 function Ensure-SharedAutoDial {
     Write-Step 'Setting SharedAutoDial=1'
-    New-Item -Path 'HKLM:\System\CurrentControlSet\Services\SharedAccess\Parameters' `
-        -Force | Out-Null
     New-ItemProperty `
         -Path 'HKLM:\System\CurrentControlSet\Services\SharedAccess\Parameters' `
         -Name 'SharedAutoDial' `
