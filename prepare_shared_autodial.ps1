@@ -129,12 +129,18 @@ function Ensure-VpnConnection(
         -ErrorAction SilentlyContinue
     if ($existing) {
         Write-Step "Disconnecting existing VPN entry '$Name'"
-        & rasdial.exe $Name /disconnect > $null 2>&1
+        & rasdial.exe $Name /disconnect "/PHONEBOOK:$phonebookPath" > $null 2>&1
+        Start-Sleep -Seconds 2
         Write-Step "Removing existing all-users VPN entry '$Name'"
-        Remove-VpnConnection `
-            -Name $Name `
-            -AllUserConnection `
-            -Force | Out-Null
+        try {
+            Remove-VpnConnection `
+                -Name $Name `
+                -AllUserConnection `
+                -Force | Out-Null
+        } catch {
+            Write-Step "Could not remove '$Name'; reusing the existing entry"
+            return
+        }
     }
 
     Write-Step "Creating all-users PPTP VPN entry '$Name'"
