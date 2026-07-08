@@ -3,6 +3,10 @@ Set-StrictMode -Version Latest
 
 $programData = [Environment]::GetFolderPath('CommonApplicationData')
 $phonebookPath = Join-Path $programData 'Microsoft\Network\Connections\Pbk\rasphone.pbk'
+$defaultVpnName = 'LpeLabVpn'
+$defaultVpnServer = '10.37.1.208'
+$defaultVpnUser = 'guestlab'
+$defaultVpnPassword = 'Passw0rd!'
 
 $rasSource = @"
 using System;
@@ -61,6 +65,16 @@ function Read-Value([string]$Prompt, [string]$Default = '') {
     return (Read-Host $Prompt).Trim()
 }
 
+function Read-RequiredValue([string]$Prompt) {
+    while ($true) {
+        $value = (Read-Host $Prompt).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value
+        }
+        Write-Host "[!] $Prompt cannot be blank"
+    }
+}
+
 function Assert-Admin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -86,6 +100,18 @@ function Ensure-SharedAutoDial {
         -Value 1 `
         -PropertyType DWord `
         -Force | Out-Null
+}
+
+function Ensure-ServiceRunning([string]$Name) {
+    $service = Get-Service -Name $Name -ErrorAction Stop
+    if ($service.Status -eq 'Running') {
+        Write-Step "$Name is already running"
+        return
+    }
+
+    Write-Step "Starting $Name"
+    Start-Service -Name $Name
+    $service.WaitForStatus('Running', [TimeSpan]::FromSeconds(15))
 }
 
 function Ensure-VpnConnection(
@@ -297,16 +323,17 @@ Assert-Admin
 Write-Step 'Preparing shared autodial prerequisites'
 Write-Step "All-users phonebook: $phonebookPath"
 
-$vpnName = Read-Value -Prompt 'VPN entry name' -Default 'LpeLabVpn'
-$vpnServer = Read-Value -Prompt 'VPN server or IP'
-$vpnUser = Read-Value -Prompt 'VPN username'
-$vpnPassword = Read-Value -Prompt 'VPN password'
+$vpnName = Read-Value -Prompt 'VPN entry name' -Default $defaultVpnName
+$vpnServer = Read-Value -Prompt 'VPN server or IP' -Default $defaultVpnServer
+$vpnUser = Read-Value -Prompt 'VPN username' -Default $defaultVpnUser
+$vpnPassword = Read-Value -Prompt 'VPN password' -Default $defaultVpnPassword
 
 Write-Step 'Available network connection names'
 Get-NetAdapter | Sort-Object Name | Format-Table -AutoSize Name, InterfaceDescription, Status
 Write-Host
-$privateAdapter = Read-Value -Prompt 'Private ICS adapter name'
+$privateAdapter = Read-RequiredValue -Prompt 'Private ICS adapter name'
 
+Ensure-ServiceRunning -Name 'RasMan'
 Ensure-SharedAutoDial
 Ensure-VpnConnection -Name $vpnName -ServerAddress $vpnServer
 Update-PhonebookEntry `

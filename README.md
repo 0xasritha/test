@@ -63,6 +63,13 @@ That script prompts for the machine-specific values:
 - VPN password
 - private ICS adapter name
 
+Current defaults in the script are the lab PPTP server:
+
+- VPN entry name: `LpeLabVpn`
+- VPN server/IP: `10.37.1.208`
+- VPN username: `guestlab`
+- VPN password: `Passw0rd!`
+
 It then:
 
 - sets `SharedAutoDial=1`
