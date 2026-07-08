@@ -8,10 +8,28 @@ echo [+] Current user:
 whoami
 echo.
 
+echo [+] Current session state
+quser
+echo.
+list_sessions.exe
+echo.
+probe_console_token.exe
+echo.
+
+echo [+] RasAuto service state before trigger
+sc query RasAuto
+echo.
+
 echo [+] Signaling RasAutoDialSharedConnectionEvent
 signal_event.exe
 if errorlevel 1 (
     echo [!] signal_event.exe failed with %errorlevel%
+    echo.
+    echo [+] RasAuto service state after trigger failure
+    sc query RasAuto
+    echo.
+    echo [+] Shared-connection probe
+    query_shared_connection.exe
     exit /b %errorlevel%
 )
 
