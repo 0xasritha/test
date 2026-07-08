@@ -21,6 +21,7 @@ The current payload in `pwn.c` does this when the exploit lands:
 - `launch_builtin_guest.c`: helper source for the built-in `Guest` launcher
 - `list_sessions.c`: WTS session dump helper
 - `probe_console_token.c`: checks whether the active console user token is queryable
+- `prepare_shared_autodial.ps1`: creates the shared VPN / ICS / saved-creds state
 - `query_shared_connection.c`: shared-connection environment check
 - `fix_guest_logon.ps1`: Guest logon-rights repair script
 - `the-vulnerable-rasmans.dll`: vulnerable RasMan image loaded by `exploit_host2.exe`
@@ -34,7 +35,7 @@ Known-good runtime shape:
 - built-in `Guest` is the active console user
 - no admin GUI session is active
 - a low-priv helper account is used to own the fake RasMan endpoint
-- the lab already has the shared-autodial / ICS / shared-VPN prerequisites in place
+- the shared-autodial / ICS / shared-VPN prerequisites are in place
 
 ## Copy To The VM
 
@@ -47,6 +48,31 @@ C:\Users\Public\Desktop\EXPLOIT
 The scripts assume that exact path.
 
 ## Step 1: Run The Administrative Setup
+
+On a fresh machine, first prepare the shared VPN / ICS state:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\prepare_shared_autodial.ps1
+```
+
+That script prompts for the machine-specific values:
+
+- VPN entry name
+- VPN server/IP
+- VPN username
+- VPN password
+- private ICS adapter name
+
+It then:
+
+- sets `SharedAutoDial=1`
+- creates an all-users PPTP VPN entry
+- normalizes the phonebook entry to `WAN Miniport (PPTP)`
+- stores saved RAS credentials in the all-users phonebook
+- enables ICS with the VPN as the public shared connection
+- prints `RasGetCredentialsW` and `RasQuerySharedConnectionW` verification
+
+After that, run the exploit setup:
 
 Open an elevated `cmd.exe` and run:
 
@@ -124,7 +150,11 @@ Successful output should include:
 
 ## Notes
 
-- The full flow is now exactly two scripts:
+- On a fresh machine, the full flow is:
+  - `prepare_shared_autodial.ps1`
+  - `admin_setup.cmd`
+  - `guest_trigger.cmd`
+- After the prerequisites are in place, the exploit itself is still the same two-step flow:
   - `admin_setup.cmd`
   - `guest_trigger.cmd`
 - `admin_setup.cmd` must be run first.
