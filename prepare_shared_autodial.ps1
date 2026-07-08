@@ -128,6 +128,8 @@ function Ensure-VpnConnection(
         -AllUserConnection `
         -ErrorAction SilentlyContinue
     if ($existing) {
+        Write-Step "Disconnecting existing VPN entry '$Name'"
+        & rasdial.exe $Name /disconnect > $null 2>&1
         Write-Step "Removing existing all-users VPN entry '$Name'"
         Remove-VpnConnection `
             -Name $Name `
@@ -145,25 +147,6 @@ function Ensure-VpnConnection(
         -RememberCredential `
         -AllUserConnection `
         -Force | Out-Null
-}
-
-function Connect-Vpn(
-    [string]$Name,
-    [string]$UserName,
-    [string]$Password
-) {
-    Write-Step "Connecting VPN entry '$Name' once with rasdial"
-    $arguments = @(
-        $Name,
-        $UserName,
-        $Password,
-        "/PHONEBOOK:$phonebookPath"
-    )
-    $output = & rasdial.exe @arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $text = ($output | Out-String).Trim()
-        throw "rasdial failed with ${LASTEXITCODE}: $text"
-    }
 }
 
 function Update-PhonebookEntry(
@@ -371,7 +354,6 @@ Update-PhonebookEntry `
         CustomAuthKey = '0'
     }
 Set-RasCredentials -EntryName $vpnName -UserName $vpnUser -Password $vpnPassword
-Connect-Vpn -Name $vpnName -UserName $vpnUser -Password $vpnPassword
 try {
     Enable-Ics -PublicName $vpnName -PrivateName $privateAdapter
 } catch {
