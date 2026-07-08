@@ -1,6 +1,32 @@
 #include <windows.h>
+#include <stdio.h>
 
 #include <wchar.h>
+
+static void print_last_error(const wchar_t* operation, DWORD error) {
+    wchar_t message[512];
+    DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    DWORD length = FormatMessageW(
+        flags,
+        NULL,
+        error,
+        0,
+        message,
+        (DWORD)(sizeof(message) / sizeof(message[0])),
+        NULL
+    );
+    if (length == 0) {
+        fwprintf(stderr, L"[!] %ls failed with error %lu\n", operation, error);
+        return;
+    }
+
+    while (length > 0 &&
+           (message[length - 1] == L'\r' || message[length - 1] == L'\n')) {
+        message[length - 1] = 0;
+        --length;
+    }
+    fwprintf(stderr, L"[!] %ls failed with error %lu: %ls\n", operation, error, message);
+}
 
 static int parse_args(
     int argc,
@@ -93,7 +119,9 @@ int wmain(int argc, wchar_t** argv) {
         &pi
     );
     if (!ok) {
-        return (int)GetLastError();
+        DWORD error = GetLastError();
+        print_last_error(L"CreateProcessWithLogonW", error);
+        return (int)error;
     }
 
     if (wait) {

