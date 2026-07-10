@@ -1,45 +1,42 @@
-# Guest Path Package
+# Guest Demo Package
 
-This directory contains the built-in `Guest` trigger path for the RasAuto/RasMan LPE.
+This directory contains the final two-script demo flow for the working
+`Guest -> rasauto -> fake RasMan -> ReferenceCustomCount -> pwn.dll` LPE path.
 
-The current payload in `pwn.c` does this when the exploit lands:
+The package is designed around:
 
-- loads `pwn.dll` in the SYSTEM `rasauto` process
-- runs `net localgroup Administrators <helper-user> /add`
-- writes `group_add.txt`
-- writes `system.txt` with `whoami`
+- one administrator-run setup script: `admin_setup.cmd`
+- one built-in `Guest` trigger script: `guest_trigger.cmd`
 
-## Contents
+## What The Demo Proves
 
-- `admin_setup.cmd`: run this once from an elevated administrator shell
-- `guest_trigger.cmd`: run this while logged in as built-in `Guest`
-- `exploit_host2.cpp`: fake RasMan host
-- `pwn.c`: DLL payload
-- `pwn.pbk`: custom PBK used on the hangup path
-- `signal_event.c`: sets `RasAutoDialSharedConnectionEvent`
-- `launch_guest.c`: starts a process as the chosen low-priv helper account
-- `launch_builtin_guest.c`: helper source for the built-in `Guest` launcher
-- `list_sessions.c`: WTS session dump helper
-- `probe_console_token.c`: checks whether the active console user token is queryable
-- `prepare_shared_autodial.ps1`: creates the shared VPN / ICS / saved-creds state
-- `query_shared_connection.c`: shared-connection environment check
-- `fix_guest_logon.ps1`: Guest logon-rights repair script
-- `the-vulnerable-rasmans.dll`: vulnerable RasMan image loaded by `exploit_host2.exe`
+The final payload in `pwn.c` does two things when `rasauto` loads `pwn.dll` as SYSTEM:
 
-## Intended State
+- adds the chosen low-priv helper user to `Administrators`
+- writes `system.txt` containing `whoami`
 
-This package is for the built-in `Guest` path only.
+On a successful run you should see:
 
-Known-good runtime shape:
+- `load.txt` contains `loaded`
+- `group_add.txt` shows the `Administrators` add succeeded
+- `system.txt` contains `nt authority\system`
 
-- built-in `Guest` is the active console user
-- no admin GUI session is active
-- a low-priv helper account is used to own the fake RasMan endpoint
-- the shared-autodial / ICS / shared-VPN prerequisites are in place
+## Required Local State
 
-## Copy To The VM
+Before the exploit can work, the machine must already be in the shared-autodial state:
 
-Copy the contents of this directory to:
+- `SharedAutoDial=1`
+- ICS configured so the shared/public connection is the VPN entry
+- the shared connection is a RAS/VPN entry
+- saved credentials exist for that shared VPN entry
+
+This package includes `prepare_shared_autodial.ps1` to build that state.
+
+## End-To-End Local Demo
+
+### 1. Copy The Folder
+
+Copy this directory to:
 
 ```cmd
 C:\Users\Public\Desktop\EXPLOIT
@@ -47,41 +44,36 @@ C:\Users\Public\Desktop\EXPLOIT
 
 The scripts assume that exact path.
 
-## Step 1: Run The Administrative Setup
+### 2. Prepare The Shared VPN / ICS State
 
-On a fresh machine, first prepare the shared VPN / ICS state:
+From an elevated PowerShell:
 
 ```powershell
+cd C:\Users\Public\Desktop\EXPLOIT
 powershell -ExecutionPolicy Bypass -File .\prepare_shared_autodial.ps1
 ```
 
-That script prompts for the machine-specific values:
+What it does:
 
-- VPN entry name
-- VPN server/IP
-- VPN username
-- VPN password
-- private ICS adapter name
+- starts the real `MpsSvc`, `SharedAccess`, and `RasMan` services
+- sets `SharedAutoDial=1`
+- creates or normalizes the all-users PPTP VPN entry
+- stores saved credentials for that VPN entry
+- enables ICS with the VPN as public and your chosen adapter as private
+- verifies `RasQuerySharedConnection`
 
-Current defaults in the script are the lab PPTP server:
+Defaults currently baked into the script:
 
-- VPN entry name: `LpeLabVpn`
-- VPN server/IP: `10.37.1.208`
+- entry name: `LpeLabVpn`
+- VPN server: `10.37.1.208`
 - VPN username: `guestlab`
 - VPN password: `Passw0rd!`
 
-It then:
+You still need to provide the private ICS adapter name for the local machine.
 
-- sets `SharedAutoDial=1`
-- creates an all-users PPTP VPN entry
-- normalizes the phonebook entry to `WAN Miniport (PPTP)`
-- stores saved RAS credentials in the all-users phonebook
-- enables ICS with the VPN as the public shared connection
-- prints `RasGetCredentialsW` and `RasQuerySharedConnectionW` verification
+### 3. Run The Administrator Setup
 
-After that, run the exploit setup:
-
-Open an elevated `cmd.exe` and run:
+From an elevated `cmd.exe`:
 
 ```cmd
 cd C:\Users\Public\Desktop\EXPLOIT
@@ -90,42 +82,41 @@ admin_setup.cmd
 
 What `admin_setup.cmd` does:
 
-- prints each step with `[+]`
-- prompts for:
-  - low-priv helper username
-  - low-priv helper password
-  - built-in `Guest` password, which can be left blank
-- finds `VsDevCmd.bat` from common Visual Studio locations, then prompts for the path if autodiscovery fails
-- enables built-in `Guest`
-- updates the built-in `Guest` password to the value you entered
-- creates the helper account automatically if it does not already exist
-- adds `Guest` to `Remote Desktop Users`
-- runs `fix_guest_logon.ps1`
-- builds all required binaries
-- bakes the chosen helper username into `pwn.dll`
+- enables the built-in `Guest` account
+- creates or updates the low-priv helper account
+- repairs `Guest` logon rights with `fix_guest_logon.ps1`
+- builds the required binaries with MSVC
+- creates a second phonebook entry named `pwn` in the real all-users phonebook
+- clears `CustomDialDll` / `CustomRasDialDll` from the live shared VPN entry
+- sets `CustomDialDll` / `CustomRasDialDll` on the cloned `pwn` entry
 - removes the helper account from `Administrators`
 - clears old proof files
-- stops `RasMan`
-- starts `RasAuto`
-- starts the fake RasMan host as the chosen low-priv helper account
-- verifies that `exploit_host2.exe` is still running and that `squatter.log` was created
-- prints the current session and console-token state
+- stops the real `RasMan`
+- starts the fake low-priv `RasMan` host
+- restarts `RasAuto` so it binds against the fake endpoint
+- prints current session state
 
-If the script prompts for `VsDevCmd.bat`, paste the full path from your machine.
+Prompts you will see:
 
-## Step 2: Log In As Built-in Guest
+- helper username
+- helper password
+- built-in `Guest` password
+- shared VPN entry name
+- `VsDevCmd.bat` path if autodiscovery fails
+
+### 4. Log In As Built-in Guest
 
 After `admin_setup.cmd` completes:
 
-1. Log out of any GUI admin session.
-2. Log in manually as built-in `Guest`.
-3. Make sure this is the visible console session.
+- log out of any GUI admin desktop
+- log in as the built-in `Guest`
+- make sure `Guest` is the active `console` session
 
-The package is written for the built-in `Guest` account, not `guestlab`.
+This package is for the built-in `Guest` path, not for a normal low-priv user session.
 
-## Step 3: Run The Guest Trigger
+### 5. Run The Guest Trigger
 
-While logged in as built-in `Guest`, open `cmd.exe` and run:
+From a `cmd.exe` running as built-in `Guest`:
 
 ```cmd
 cd C:\Users\Public\Desktop\EXPLOIT
@@ -134,35 +125,99 @@ guest_trigger.cmd
 
 What `guest_trigger.cmd` does:
 
-- prints each step with `[+]`
-- shows `whoami`
-- runs `signal_event.exe`
-- waits for the SYSTEM cleanup path
+- prints the current `Guest` session state
+- signals `RasAutoDialSharedConnectionEvent`
+- waits for the cleanup / hang-up path
 - prints:
   - `squatter.log`
   - `load.txt`
   - `group_add.txt`
   - `system.txt`
-  - final `Administrators` membership
 
-## Success Criteria
+## Expected Successful Output
 
-Successful output should include:
+The run is successful when all of these are true:
 
 - `squatter.log` contains `SubmitRequestLocal code=101`
 - `load.txt` contains `loaded`
-- `group_add.txt` shows the `net localgroup Administrators <helper-user> /add` result
+- `group_add.txt` contains `The command completed successfully.`
 - `system.txt` contains `nt authority\system`
-- `net localgroup Administrators` now lists the helper account you chose during `admin_setup.cmd`
+
+If you want a final admin-side verification after the demo:
+
+```cmd
+net localgroup Administrators
+```
+
+The helper user should now be listed.
+
+## File Guide
+
+### Entry Scripts
+
+- `admin_setup.cmd`
+  Performs the full administrator-side preparation and starts the fake low-priv
+  `RasMan` server.
+- `guest_trigger.cmd`
+  Runs from the built-in `Guest` session and signals `rasauto`.
+
+### Exploit Core
+
+- `exploit_host2.cpp`
+  The fake low-priv `RasMan` RPC server. This is the main exploit logic.
+- `the-vulnerable-rasmans.dll`
+  The vulnerable `rasmans.dll` image loaded and patched by `exploit_host2.exe`.
+- `pwn.c`
+  The SYSTEM payload DLL source. Builds to `pwn.dll`.
+
+### Phonebook / Payload Helpers
+
+- `fix_phonebook_entry.ps1`
+  Clones the real shared VPN entry to a second `pwn` entry in the all-users
+  phonebook and assigns the custom DLL path there.
+- `pwn.pbk`
+  Legacy custom phonebook artifact from earlier iterations. The final demo uses
+  the real all-users phonebook plus the `pwn` clone entry instead.
+
+### Environment Setup
+
+- `prepare_shared_autodial.ps1`
+  Builds the shared VPN / ICS / saved-creds prerequisite state.
+- `fix_guest_logon.ps1`
+  Repairs built-in `Guest` logon rights.
+- `query_shared_connection.c`
+  Source for `query_shared_connection.exe`, which checks whether Windows sees a
+  shared RAS/VPN connection.
+
+### Trigger / Session Helpers
+
+- `signal_event.c`
+  Source for `signal_event.exe`, which signals
+  `RasAutoDialSharedConnectionEvent`.
+- `launch_guest.c`
+  Launches a process as the chosen low-priv helper user.
+- `launch_builtin_guest.c`
+  Launch helper source for the built-in `Guest` account.
+- `list_sessions.c`
+  Dumps WTS session state in a compact format.
+- `probe_console_token.c`
+  Probes the active console session token state.
+- `launch_active_console.c`
+  Earlier helper source for launching in the active console session.
+
+### Debug / Lab Files
+
+- `make_pwn_pbk.c`
+  Experimental phonebook-generation helper from earlier debugging.
+- `test_pbook_lpe.c`
+  Phonebook validation helper used while debugging the final `code=101` path.
+- `talk-outline.md`
+  Notes for presenting or explaining the exploit chain.
 
 ## Notes
 
-- On a fresh machine, the full flow is:
-  - `prepare_shared_autodial.ps1`
-  - `admin_setup.cmd`
-  - `guest_trigger.cmd`
-- After the prerequisites are in place, the exploit itself is still the same two-step flow:
-  - `admin_setup.cmd`
-  - `guest_trigger.cmd`
-- `admin_setup.cmd` must be run first.
-- `guest_trigger.cmd` must be run while logged in as built-in `Guest`.
+- The final proven path does not require editing the live shared VPN entry to
+  point at the payload DLL.
+- The shared VPN entry stays clean for dialing.
+- The DLL path lives on the cloned `pwn` entry, and `ReferenceCustomCount`
+  redirects the hang-up path there.
