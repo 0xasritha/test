@@ -86,6 +86,7 @@ What `admin_setup.cmd` does:
 - creates or updates the low-priv helper account
 - repairs `Guest` logon rights with `fix_guest_logon.ps1`
 - builds the required binaries with MSVC
+- verifies `RasQuerySharedConnection` is `err=0` with a nonzero value
 - creates a second phonebook entry named `pwn` in the real all-users phonebook
 - clears `CustomDialDll` / `CustomRasDialDll` from the live shared VPN entry
 - sets `CustomDialDll` / `CustomRasDialDll` on the cloned `pwn` entry
@@ -94,6 +95,7 @@ What `admin_setup.cmd` does:
 - stops the real `RasMan`
 - starts the fake low-priv `RasMan` host
 - restarts `RasAuto` so it binds against the fake endpoint
+- fails if `RasAuto` does not rebind and produce the expected `code=113` and `code=55`
 - prints current session state
 
 Prompts you will see:
@@ -142,6 +144,9 @@ The run is successful when all of these are true:
 - `load.txt` contains `loaded`
 - `group_add.txt` contains `The command completed successfully.`
 - `system.txt` contains `nt authority\system`
+
+The setup step is only considered healthy if `admin_setup.cmd` itself succeeds.
+If it fails before the Guest step, do not run `guest_trigger.cmd`.
 
 If you want a final admin-side verification after the demo:
 

